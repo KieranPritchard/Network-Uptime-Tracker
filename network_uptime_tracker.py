@@ -1,4 +1,7 @@
+import time
 import streamlit as st
+from scapy.all import IP, ICMP, sr1
+from datetime import datetime
 import socket
 import os
 import re
@@ -58,6 +61,42 @@ def get_all_server_locations(filepath: str) -> list:
 
     # Returns the locations variable
     return resolved
+
+def ping_sweep(resolved: list[str]) -> list:
+    """Function to ping the resolved location and gather data about it"""
+
+    # Stores results
+    results = []
+
+    # Loops over the hosts in resolved
+    for host in resolved:
+        
+        # Stores the ip address
+        ip = str(host)
+
+        # Creates an echo packet
+        packet = IP(dst=host) / ICMP()
+
+        # Sarts the response timer
+        start = time.perf_counter()
+
+        # Stores the response from the location
+        response = sr1(packet, timeout=1, verbose=0)
+
+        # Stores the elasped time
+        elapsed = (time.perf_counter() - start) * 1000
+
+        # Checks if there is a response
+        if response is None:
+            results.append({"host": ip, "online": True, "response_time_ms": 0, "timestamp": datetime.now()})
+            print(f"  {ip:20s}  OFFLINE")
+        else:
+            rtt = round(elapsed, 2)
+            results.append({"host": ip, "status": False, "response_time_ms": rtt, "timestamp": datetime.now()})
+            print(f"  {ip:20s}  ONLINE   {rtt} ms")
+
+    # Returns the results
+    return results
 
 # Sets the page configuration
 st.set_page_config(page_title="Server Status Dashboard", layout="wide")
