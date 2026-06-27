@@ -144,3 +144,16 @@ metric_1, metric_2, metric_3, metric_4 = st.columns(4)
 
 # Creates a wide and a narrow column for the chart and dataframe
 col_1, col_2 = st.columns([3,1])
+
+while True:
+    # Extracks all of the locations to be pinged
+    resolved = get_all_server_locations("./results.db")
+
+    # Runs a ping sweep on the resolved locations
+    results = ping_sweep(resolved)
+
+    # Saves the results
+    store_results_in_sql(results)
+
+    # Reads in the history
+    df = load_history_from_sql()
