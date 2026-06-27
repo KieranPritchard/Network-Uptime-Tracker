@@ -1,5 +1,7 @@
 import time
 import streamlit as st
+import pandas as pd
+import sqlite3
 from scapy.all import IP, ICMP, sr1
 from datetime import datetime
 import socket
@@ -97,6 +99,39 @@ def ping_sweep(resolved: list[str]) -> list:
 
     # Returns the results
     return results
+
+def store_results_in_sql(results:list[dict]):
+    """Function to store results in sqllite database"""
+
+    # Creates a data frame with the results
+    df = pd.DataFrame(results)
+
+    # Gets the date in dd/mm/yyyy format
+    date = datetime.now().strftime("%d/%m/%Y")
+
+    # Adds the date column to the dataframe
+    df["date"] = date
+
+    # Connects to the SQLite database (creates it if it doesn't exist)
+    conn = sqlite3.connect("results.db")
+
+    # Saves the dataframe to the database
+    df.to_sql("results", conn, if_exists="append", index=False)
+
+    # Closes the connection
+    conn.close()
+
+def load_history_from_sql() -> pd.DataFrame:
+    """Loads all historical results from the SQLite database"""
+
+    if not os.path.exists("results.db"):
+        return pd.DataFrame()
+
+    conn = sqlite3.connect("results.db")
+    df = pd.read_sql("SELECT * FROM results", conn)
+    conn.close()
+    
+    return df
 
 # Sets the page configuration
 st.set_page_config(page_title="Server Status Dashboard", layout="wide")
