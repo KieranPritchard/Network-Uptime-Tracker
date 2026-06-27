@@ -130,8 +130,17 @@ def load_history_from_sql() -> pd.DataFrame:
     conn = sqlite3.connect("results.db")
     df = pd.read_sql("SELECT * FROM results", conn)
     conn.close()
-    
+
     return df
 
 # Sets the page configuration
 st.set_page_config(page_title="Server Status Dashboard", layout="wide")
+
+# Gives the page a title
+st.title("Network Uptime Tracker")
+
+# Creates four columns for the metrics
+metric_1, metric_2, metric_3, metric_4 = st.columns(4)
+
+# Creates a wide and a narrow column for the chart and dataframe
+col_1, col_2 = st.columns([3,1])
