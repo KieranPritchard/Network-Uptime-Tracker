@@ -106,8 +106,8 @@ def store_results_in_sql(results:list[dict]):
     # Creates a data frame with the results
     df = pd.DataFrame(results)
 
-    # Gets the date in dd/mm/yyyy format
-    date = datetime.now().strftime("%d/%m/%Y")
+    # Gets the date
+    date = datetime.now()
 
     # Adds the date column to the dataframe
     df["date"] = date
