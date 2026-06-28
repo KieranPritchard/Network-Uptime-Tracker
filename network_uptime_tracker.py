@@ -35,7 +35,9 @@ def get_all_server_locations(filepath: str) -> list:
     # Opens the file
     with open(filepath) as f:
         # Reads the file and saves the location to a variable
-        locations = f.readlines()
+        # FIX: strip() removes trailing newlines/whitespace that would break
+        # the regex match and hostname resolution
+        locations = [line.strip() for line in f.readlines()]
 
     # Stores the resolved locations
     resolved = []
@@ -48,7 +50,7 @@ def get_all_server_locations(filepath: str) -> list:
 
         # Checks if the location is already a valid location
         if IPV4_PATTERN.match(location):
-            # Adds the pattern to the reolved
+            # Adds the pattern to the resolved
             resolved.append(location)
         else:
             # Treat it as a hostname and attempt to resolve it to an IP
@@ -79,41 +81,35 @@ def ping_sweep(resolved: list[str]) -> list:
         # Creates an echo packet
         packet = IP(dst=host) / ICMP()
 
-        # Sarts the response timer
+        # Starts the response timer
         start = time.perf_counter()
 
         # Stores the response from the location
         response = sr1(packet, timeout=1, verbose=0)
 
-        # Stores the elasped time
+        # Stores the elapsed time
         elapsed = (time.perf_counter() - start) * 1000
 
-        # Checks if there is a response
+        # FIX: inverted online/offline logic and inconsistent key names corrected
         if response is None:
-            results.append({"host": ip, "online": True, "response_time_ms": 0, "timestamp": datetime.now()})
+            results.append({"host": ip, "online": False, "response_time_ms": 0, "timestamp": datetime.now()})
             print(f"  {ip:20s}  OFFLINE")
         else:
             rtt = round(elapsed, 2)
-            results.append({"host": ip, "status": False, "response_time_ms": rtt, "timestamp": datetime.now()})
+            results.append({"host": ip, "online": True, "response_time_ms": rtt, "timestamp": datetime.now()})
             print(f"  {ip:20s}  ONLINE   {rtt} ms")
 
     # Returns the results
     return results
 
-def store_results_in_sql(results:list[dict]):
-    """Function to store results in sqllite database"""
+def store_results_in_sql(results: list[dict]):
+    """Function to store results in sqlite database"""
 
     # Creates a data frame with the results
     df = pd.DataFrame(results)
 
-    # Gets the date
-    date = datetime.now()
-
-    # Adds the date column to the dataframe
-    df["date"] = date
-
     # Connects to the SQLite database (creates it if it doesn't exist)
-    conn = sqlite3.connect("results.db")
+    conn = sqlite3.connect("./results.db")
 
     # Saves the dataframe to the database
     df.to_sql("results", conn, if_exists="append", index=False)
@@ -124,10 +120,10 @@ def store_results_in_sql(results:list[dict]):
 def load_history_from_sql() -> pd.DataFrame:
     """Loads all historical results from the SQLite database"""
 
-    if not os.path.exists("results.db"):
+    if not os.path.exists("./results.db"):
         return pd.DataFrame()
 
-    conn = sqlite3.connect("results.db")
+    conn = sqlite3.connect("./results.db")
     df = pd.read_sql("SELECT * FROM results", conn)
     conn.close()
 
@@ -143,17 +139,37 @@ st.title("Network Uptime Tracker")
 metric_1, metric_2, metric_3, metric_4 = st.columns(4)
 
 # Creates a wide and a narrow column for the chart and dataframe
-col_1, col_2 = st.columns([3,1])
+col_1, col_2 = st.columns([3, 1])
 
-while True:
-    # Extracks all of the locations to be pinged
-    resolved = get_all_server_locations("./results.db")
+# Gets all of the server locations
+resolved = get_all_server_locations("./hosts.txt")
 
-    # Runs a ping sweep on the resolved locations
-    results = ping_sweep(resolved)
+# Stores the results of the ping sweep
+results = ping_sweep(resolved)
 
-    # Saves the results
-    store_results_in_sql(results)
+# Stores the results to sql
+store_results_in_sql(results)
 
-    # Reads in the history
-    df = load_history_from_sql()
+# Gets the data from the sql shit
+df = load_history_from_sql()
+
+# Creates the first metric
+with metric_1:
+    # Store the current runs timestamp
+    current_run = df["timestamp"].max()
+
+    # Stores the previous runs timestamp
+    prev_run = df[df["timestamp"] != current_run]["timestamp"].max()
+
+    # Stores the current count for the time stamp
+    current_count = df[df["timestamp"] == current_run]["host"].nunique()
+    
+    # Stores the previous run
+    prev_count = df[df["timestamp"] == prev_run]["host"].nunique() if prev_run else None
+
+    # Displays the metric
+    st.metric("Total hosts", current_count, delta=current_count - prev_count if prev_count is not None else None)
+
+# Auto-refresh every 60 seconds
+time.sleep(60)
+st.rerun()
