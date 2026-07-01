@@ -108,6 +108,14 @@ def store_results_in_sql(results: list[dict]):
     # Creates a data frame with the results
     df = pd.DataFrame(results)
 
+    # Checks if the results file exists
+    if not os.path.exists("./results.db"):
+        # Creates the file to store the data long term
+        file = open("./results.db", "w")
+
+        # Closes the file
+        file.close()
+
     # Connects to the SQLite database (creates it if it doesn't exist)
     conn = sqlite3.connect("./results.db")
 
