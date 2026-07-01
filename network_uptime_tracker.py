@@ -170,6 +170,24 @@ with metric_1:
     # Displays the metric
     st.metric("Total hosts", current_count, delta=current_count - prev_count if prev_count is not None else None)
 
+# Creates the total online metric
+with metric_2:
+    # Stores the current runs time stamp
+    current_run = df["timestamp"].max()
+    
+    # Stores the previous runs timestamp
+    prev_run = df[df["timestamp"] != current_run]["timestamp"].max()
+
+    # Stores the current count for the time stamp
+    current_count = df[df["timestamp"] == current_run]["online"].count()
+
+    # Stores the count from the previous run
+    prev_count = df[df["timestamp"] == prev_run]["online"].nunique() if prev_run else None
+
+    # Displays the metric
+    st.metric("Total hosts online", current_count, delta=current_count - prev_count if prev_count is not None else None)
+
+
 # Auto-refresh every 60 seconds
 time.sleep(60)
 st.rerun()
