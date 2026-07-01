@@ -216,6 +216,23 @@ with metric_3:
     # Displays the metric
     st.metric("Total hosts offline", current_count, delta=current_count - prev_count if prev_count is not None else None)
 
+# Fourth metric for average response
+with metric_4:
+    # Stores the current run
+    current_run = df["timestamp"].max()
+
+    # Stores the previous runs timestamp
+    prev_run = df[df["timestamp"] != current_run]["timestamp"].max()
+
+    # Gets the current average
+    current_average = df[df["timestamp"] == current_run]["response_time_ms"].mean()
+
+    # Gets the previous average
+    prev_average = df[df["timestamp"] == prev_run]["response_time_ms"].mean()
+
+    # Displays the metric
+    st.metric("Average Response Time", current_average, delta=current_average - prev_average if prev_average is not None else None)
+
 # Auto-refresh every 60 seconds
 time.sleep(60)
 st.rerun()
