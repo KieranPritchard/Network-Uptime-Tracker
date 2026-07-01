@@ -139,7 +139,7 @@ st.title("Network Uptime Tracker")
 metric_1, metric_2, metric_3, metric_4 = st.columns(4)
 
 # Creates a wide and a narrow column for the chart and dataframe
-col_1, col_2 = st.columns([3, 1])
+col_1, col_2 = st.columns([3, 2])
 
 # Gets all of the server locations
 resolved = get_all_server_locations("./hosts.txt")
@@ -232,6 +232,22 @@ with metric_4:
 
     # Displays the metric
     st.metric("Average Response Time", current_average, delta=current_average - prev_average if prev_average is not None else None)
+
+# Creates column to store line chart
+with col_1:
+    # Groups the data by date
+    grouped_by_date = df.groupby("timestamp")["online"].count()
+
+    # Displays a line graph
+    st.line_chart(grouped_by_date)
+
+# Column to store the data frame
+with col_2:
+    # Sorts the data by timestamp
+    sorted_data = df.sort_values("timestamp", ascending=False)
+
+    # Displays the data frame
+    st.dataframe(sorted_data)
 
 # Auto-refresh every 10 seconds
 time.sleep(10)
