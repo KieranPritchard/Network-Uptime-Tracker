@@ -233,6 +233,6 @@ with metric_4:
     # Displays the metric
     st.metric("Average Response Time", current_average, delta=current_average - prev_average if prev_average is not None else None)
 
-# Auto-refresh every 60 seconds
-time.sleep(60)
+# Auto-refresh every 10 seconds
+time.sleep(10)
 st.rerun()
