@@ -161,101 +161,150 @@ store_results_in_sql(results)
 # Gets the data from the sql shit
 df = load_history_from_sql()
 
+# Removes null hosts
+df = df.dropna(subset=["host"])
+
+# Makes the timestamps be at the nearest minute
+df["timestamp"] = pd.to_datetime(df["timestamp"]).dt.floor("min")
+
 # Creates the first metric
 with metric_1:
-    # Store the current runs timestamp
-    current_run = df["timestamp"].max()
+    if not df.empty:
+        # 1. Get the latest timestamp
+        current_run = df["timestamp"].max()
 
-    # Stores the previous runs timestamp
-    prev_run = df[df["timestamp"] != current_run]["timestamp"].max()
+        # 2. Get the unique hosts for the current run
+        current_count = df[df["timestamp"] <= current_run]["host"].nunique()
 
-    # Stores the current count for the time stamp
-    current_count = df[df["timestamp"] == current_run]["host"].nunique()
-    
-    # Stores the previous run
-    prev_count = df[df["timestamp"] == prev_run]["host"].nunique() if prev_run else None
+        # 3. Filter for older data to find the *true* previous timestamp
+        past_runs = df[df["timestamp"] < current_run]
 
-    # Displays the metric
-    st.metric("Total hosts", current_count, delta=current_count - prev_count if prev_count is not None else None)
+        if not past_runs.empty:
+            prev_run = past_runs["timestamp"].max()
+            prev_count = df[df["timestamp"] <= prev_run]["host"].nunique() if not past_runs.empty else None
+            delta_val = int(current_count - prev_count)
+        else:
+            delta_val = None
+
+        # 4. Render the metric
+        st.metric(label="Total hosts", value=current_count, delta=delta_val)
+    else:
+        st.metric(label="Total hosts", value=0, delta=None)
 
 # Creates the total online metric
 with metric_2:
-    # Stores the current runs time stamp
+    # 1. Get the latest timestamp
     current_run = df["timestamp"].max()
     
-    # Stores the previous runs timestamp
-    prev_run = df[df["timestamp"] != current_run]["timestamp"].max()
+    # 2. Get all rows that belong to older runs
+    past_runs = df[df["timestamp"] < current_run]
 
-    # Stores the current count for the time stamp
-    current_count = df[df["timestamp"] == current_run]["online"].count()
+    # 3. Calculate current online hosts
+    current_count = df[(df["timestamp"] == current_run) & (df["online"] == 1)]["host"].nunique()
 
-    # Stores the count from the previous run
-    prev_count = df[df["timestamp"] == prev_run]["online"].nunique() if prev_run else None
+    # 4. Calculate previous online hosts safely
+    if not past_runs.empty:
+        prev_run = past_runs["timestamp"].max()
+        prev_count = df[(df["timestamp"] == prev_run) & (df["online"] == 1)]["host"].nunique()
+        delta_val = int(current_count - prev_count)
+    else:
+        delta_val = None
 
-    # Displays the metric
-    st.metric("Total hosts online", current_count, delta=current_count - prev_count if prev_count is not None else None)
+    # 5. Display the metric
+    st.metric(
+        label="Total hosts online", 
+        value=current_count, 
+        delta=delta_val
+    )
 
 # Creates the total offline metric
 with metric_3:
-    # Stores the current runs time stamp
+    # 1. Get the latest timestamp
     current_run = df["timestamp"].max()
     
-    # Stores the previous runs timestamp
-    prev_run = df[df["timestamp"] != current_run]["timestamp"].max()
+    # 2. Get all rows that belong to older runs
+    past_runs = df[df["timestamp"] < current_run]
 
-    # Stores the current count of hosts
-    current_host_count = df[df["timestamp"] == current_run]["host"].nunique()
+    # 3. Calculate current OFFLINE hosts (online == False)
+    current_count = df[(df["timestamp"] == current_run) & (df["online"] == 0)]["host"].nunique()
 
-    # Stores the previous host count
-    prev_host_count = df[df["timestamp"] == prev_run]["online"].nunique() if prev_run else None
+    # 4. Calculate previous OFFLINE hosts safely
+    if not past_runs.empty:
+        prev_run = past_runs["timestamp"].max()
+        prev_count = df[(df["timestamp"] == prev_run) & (df["online"] == 0)]["host"].nunique()
+        delta_val = int(current_count - prev_count)
+    else:
+        delta_val = None
 
-    # Stores the current count for the time stamp
-    current_count_online = df[df["timestamp"] == current_run]["online"].count()
-
-    # Stores the count from the previous run
-    prev_count_online = df[df["timestamp"] == prev_run]["online"].nunique() if prev_run else None
-
-    # Stores the current count
-    current_count = current_host_count - current_count_online
-
-    # Stores the previous count
-    prev_count = prev_host_count - prev_count_online
-
-    # Displays the metric
-    st.metric("Total hosts offline", current_count, delta=current_count - prev_count if prev_count is not None else None)
+    # 5. Display the metric
+    st.metric(
+        label="Total hosts offline", 
+        value=current_count, 
+        delta=delta_val
+    )
 
 # Fourth metric for average response
 with metric_4:
-    # Stores the current run
+    # 1. Get the latest timestamp
     current_run = df["timestamp"].max()
+    
+    # 2. Get all rows that belong to older runs
+    past_runs = df[df["timestamp"] < current_run]
 
-    # Stores the previous runs timestamp
-    prev_run = df[df["timestamp"] != current_run]["timestamp"].max()
-
-    # Gets the current average
+    # 3. Calculate current average response time
     current_average = df[df["timestamp"] == current_run]["response_time_ms"].mean()
 
-    # Gets the previous average
-    prev_average = df[df["timestamp"] == prev_run]["response_time_ms"].mean()
+    # 4. Calculate previous average safely
+    if not past_runs.empty:
+        prev_run = past_runs["timestamp"].max()
+        prev_average = df[df["timestamp"] == prev_run]["response_time_ms"].mean()
+        
+        # Check if both values are valid numbers before calculating delta
+        if pd.notna(current_average) and pd.notna(prev_average):
+            delta_val = f"{current_average - prev_average:+.2f} ms"
+        else:
+            delta_val = None
+    else:
+        delta_val = None
 
-    # Displays the metric
-    st.metric("Average Response Time", current_average, delta=current_average - prev_average if prev_average is not None else None)
+    # 5. Format current display value (handles empty data gracefully)
+    display_value = f"{current_average:.2f} ms" if pd.notna(current_average) else "N/A"
+
+    # 6. Display the metric
+    st.metric(
+        label="Average Response Time", 
+        value=display_value, 
+        delta=delta_val,
+        delta_color="inverse" # Optional: Turns a positive delta (higher latency) RED instead of GREEN
+    )
 
 # Creates column to store line chart
 with col_1:
-    # Groups the data by date
-    grouped_by_date = df.groupby("timestamp")["online"].count()
-
-    # Displays a line graph
-    st.line_chart(grouped_by_date)
+    st.subheader("Online Hosts Over Time")
+    
+    # .sum() adds up all the 1s, giving you the true online count per timestamp
+    grouped_by_date = (
+        df.groupby("timestamp")["online"]
+        .sum()
+        .reset_index(name="Online Hosts")
+    )
+    
+    # Explicitly set x and y for a clean, well-labeled chart
+    st.line_chart(
+        data=grouped_by_date, 
+        x="timestamp", 
+        y="Online Hosts"
+    )
 
 # Column to store the data frame
 with col_2:
-    # Sorts the data by timestamp
+    st.subheader("Recent Ingestion Data")
+    
+    # Sorts the data by timestamp so the latest logs are right at the top
     sorted_data = df.sort_values("timestamp", ascending=False)
 
-    # Displays the data frame
-    st.dataframe(sorted_data)
+    # Displays the data frame using full container width
+    st.dataframe(sorted_data, use_container_width=True)
 
 # Auto-refresh every 10 seconds
 time.sleep(10)
